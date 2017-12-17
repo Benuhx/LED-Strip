@@ -1,4 +1,7 @@
 {
-    "C_Cpp.intelliSenseEngineFallback": "Disabled",
-    "C_Cpp.errorSquiggles": "Disabled"
+    "files.associations": {
+        "functional": "cpp",
+        "ratio": "cpp",
+        "type_traits": "cpp"
+    }
 }

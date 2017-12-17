@@ -5,7 +5,7 @@
 //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER -> dann geht 3 statt D3
 #define FASTLED_ESP8266_RAW_PIN_ORDER //-> dann geht D3 statt 3
 #define FASTLED_ALLOW_INTERRUPTS 0
-// #define FASTLED_INTERRUPT_RETRY_COUNT 1
+//#define FASTLED_INTERRUPT_RETRY_COUNT 1
 #include "FastLED.h"
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
@@ -17,13 +17,16 @@
 #define RGB_ORDER GRB
 const byte ANZAHL_LEDS = 120;
 const byte PIN_LED_DATA = D3;
-const byte LED_DEFAULT_HELLIGKEIT = 255;
+const byte PIN_IP_BLINK = D7;
+const byte LED_DEFAULT_HELLIGKEIT = 60;
 //ENDE Einstellungen
 
 //## WiFi
 const String newLine = "\n";
-const byte connectionTimeoutInSekunden = 20;
-MDNSResponder mdns;
+const byte connectionTimeoutInSekunden = 10;
+//MDNSResponder mdns;
+bool serverHasBegun;
+bool wifiConfigMode;
 ESP8266WebServer server(80);
 //## ENDE WiFi
 
@@ -37,139 +40,217 @@ const byte eepromUsedBytes = 195;
 
 CRGB leds[ANZAHL_LEDS];
 
-void setup() {
-  MyDelay(1000);
+void setup()
+{
+  serverHasBegun = false;
+  ledDelay(1000);
+  pinMode(PIN_IP_BLINK, INPUT);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
-  ResetLED();
-  FastLED.show();
+  resetLedArrayAndShow();
 
   //WLAN Zugangsdaten aus EEPROM lesen
-  byte ssidLaenge = LeseByteAusEeprom(ssidLaengeAdresse);
-  byte passwordLaenge = LeseByteAusEeprom(passwordLaengeAdresse);
+  byte ssidLaenge = leseByteAusEeprom(ssidLaengeAdresse);
+  byte passwordLaenge = leseByteAusEeprom(passwordLaengeAdresse);
   byte passwortStartAdresse = ssidStartAdresse + ssidLaenge + 1;
 
   char ssid[ssidLaenge + 1];
-  LeseStringAusEeprom(ssidStartAdresse, ssidLaenge, ssid);
+  leseStringAusEeprom(ssidStartAdresse, ssidLaenge, ssid);
 
   char passwort[passwordLaenge + 1];
-  LeseStringAusEeprom(passwortStartAdresse, passwordLaenge, passwort);
+  leseStringAusEeprom(passwortStartAdresse, passwordLaenge, passwort);
   //ENDE WLAN Zugangsdaten aus EEPROM lesen
 
   WiFi.mode(WIFI_STA);
+  WiFi.hostname("ESP8266LedStrip");
   WiFi.begin(ssid, passwort);
-  unsigned long timeout = millis()  + (connectionTimeoutInSekunden * 1000);
-  bool wifiConfigMode = false;
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    if (millis() > timeout) {
+  unsigned long timeout = millis() + (connectionTimeoutInSekunden * 1000);
+  wifiConfigMode = false;
+  byte curLed = 0;
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    if (curLed >= ANZAHL_LEDS)
+    {
+      curLed = 0;
+    }
+    leds[curLed].setRGB(0, 0, 255);
+    FastLED.show();
+    curLed++;
+    ledDelay(250);
+    if (millis() > timeout)
+    {
       //Wir konnten uns nicht mit dem angegebenen WLAN verbinden.
       wifiConfigMode = true;
       break;
     }
   }
-  if (wifiConfigMode) {
+
+  if (wifiConfigMode)
+  {
     //Eigenes WLAN aufspannen
     WiFi.mode(WIFI_AP);
     IPAddress ip(192, 168, 0, 1);
     IPAddress mask(255, 255, 255, 0);
     WiFi.softAPConfig(ip, ip, mask);
-    WiFi.softAP("LED RGB", "setupLedStrip2017");
+    WiFi.softAP("LED RGB", "ledConfig");
+    setLedArrayAndShow(255, 0, 0);
+    ledDelay(1000);
   }
+  else
+  {
+    setLedArrayAndShow(0, 255, 0);
+    ledDelay(1000);
+  }
+  resetLedArrayAndShow();
+  //mdns.begin("esp8266", WiFi.localIP());
 
-  mdns.begin("esp8266", WiFi.localIP());
-
-  if (wifiConfigMode) {
+  if (wifiConfigMode)
+  {
     server.on("/", handleWlanKonfiguration);
-  } else {
+  }
+  else
+  {
     server.on("/wlan", handleWlanKonfiguration);
   }
 
   server.begin();
+  serverHasBegun = true;
 }
 
-void loop() {
-  //FastLED.delay(200);
-  RunTestmode();
-  MyDelay(3000);
-
-
-  //server.handleClient();
-  //yield();
-  //RunTestmode();
+void loop()
+{
+  if (wifiConfigMode)
+  {
+    if (serverHasBegun)
+    {
+      server.handleClient();
+    }
+    return;
+  }
+  runTestmode();
+  ledDelay(3000);
+  if (serverHasBegun)
+  {
+    server.handleClient();
+  }
 }
 
-void MyDelay(int ms)  {
-  FastLED.delay(20);
-  int hf = ms / 2 - 40;
-  yield();
-  FastLED.delay(hf);
-  delay(hf);
-  yield();
-  FastLED.delay(20);
+void ledDelay(int ms)
+{
+  if (ms < 0)
+    return;
+  int maxMsDelay = 50;
+  while (ms > 0)
+  {
+    ms = ms - maxMsDelay * 4;
+    delay(maxMsDelay * 3);
+    //FastLED.delay(maxMsDelay);
+  }
+  if (serverHasBegun)
+  {
+    server.handleClient();
+  }
+}
+
+void runTestmode()
+{
+  runTestmodeWithColor(255, 0, 0);
+  resetLedArrayAndShow();
+  runTestmodeWithColor(0, 255, 0);
+  resetLedArrayAndShow();
+  runTestmodeWithColor(0, 0, 255);
+  resetLedArrayAndShow();
+}
+
+void runTestmodeWithColor(byte r, byte g, byte b)
+{
+  for (byte i = 0; i < ANZAHL_LEDS; i++)
+  {
+    leds[i].setRGB(r, g, b);
+    FastLED.show();
+    ledDelay(150);
+  }
+}
+
+void resetLedArrayAndShow()
+{
+  setLedArrayAndShow(0, 0, 0);
+}
+
+void setLedArray(byte r, byte g, byte b)
+{
+  for (byte i = 0; i < ANZAHL_LEDS; i++)
+  {
+    leds[i].setRGB(r, g, b);
+  }
+}
+
+void setLedArrayAndShow(byte r, byte g, byte b)
+{
+  setLedArray(r, g, b);
   FastLED.show();
 }
 
-void RunTestmode() {
-  RunTestmodeWithColor(255, 0, 0);
-  ResetLED();
-  RunTestmodeWithColor(0, 255, 0);
-  ResetLED();
-  RunTestmodeWithColor(0, 0, 255);
-  ResetLED();
+void checkIpBlink()
+{
+  /*if(digitalRead(PIN_IP_BLINK) == LOW) return;
+  IPAddress addr  = WiFi.localIP();
+  for(byte i = 0; i < 4; i++) {
+    unsigned int curNum[i] = addr[i];
+    //blinkCurIpDigit(i, curNum);
+  }*/
 }
 
-void RunTestmodeWithColor(byte r, byte g, byte b) {
-  for (byte i = 0; i < ANZAHL_LEDS; i++) {
-    /*if (i == 0) {
-      leds[ANZAHL_LEDS - 1].setRGB(0, 0, 0);
-    } else {
-      leds[i - 1].setRGB(0, 0, 0);
-    }*/
-    leds[i].setRGB(r, g, b);
+void blinkCurIpDigit(byte pos, unsigned int num)
+{
+  for (byte i = 0; i < num; i++)
+  {
+    resetLedArrayAndShow();
+    leds[pos].setRGB(0, 255, 0);
     FastLED.show();
-    delay(150);
+    ledDelay(500);
   }
+  resetLedArrayAndShow();
+  FastLED.show();
+  ledDelay(1000);
 }
 
-void ResetLED() {
-  for (int i = 0; i < ANZAHL_LEDS; i++) {
-    leds[i].setRGB(0, 0, 0);
-  }
-}
-
-void handleWlanKonfiguration() {
-  if (server.args() == 2) {
+void handleWlanKonfiguration()
+{
+  if (server.args() == 2)
+  {
     String ssid = server.arg("ssid");
     String passwort = server.arg("passwort");
     ssid.replace("+", " ");
     passwort.replace("+", " ");
-    if (ssid.length() < 1 || passwort.length() < 1) {
+    if (ssid.length() < 1 || passwort.length() < 1)
+    {
       server.send(501, "text/plain", "SSID oder Passwort Laenge war 0!");
       return;
     }
     //SSID in EEPROM speichern
     byte laengeSsid = ssid.length();
     byte langePasswort = passwort.length();
-    if (laengeSsid > 128 || langePasswort > 128) {
+    if (laengeSsid > 128 || langePasswort > 128)
+    {
       server.send(501, "text/plain", "SSID oder Passwort war laenger als 128 Zeichen!");
       return;
     }
-    SpechereByteInEeprom(laengeSsid, ssidLaengeAdresse);
-    SpechereByteInEeprom(langePasswort, passwordLaengeAdresse);
-    SpeichereStringInEeprom(ssid, ssidStartAdresse);
+    spechereByteInEeprom(laengeSsid, ssidLaengeAdresse);
+    spechereByteInEeprom(langePasswort, passwordLaengeAdresse);
+    speichereStringInEeprom(ssid, ssidStartAdresse);
     byte passwortStartAdresse = ssidStartAdresse + laengeSsid + 1;
-    SpeichereStringInEeprom(passwort, passwortStartAdresse);
+    speichereStringInEeprom(passwort, passwortStartAdresse);
     //Lesen zum 1zu1 ausgeben:
-    byte ssidLaengeR = LeseByteAusEeprom(ssidLaengeAdresse);
-    byte passwordLaengeR = LeseByteAusEeprom(passwordLaengeAdresse);
+    byte ssidLaengeR = leseByteAusEeprom(ssidLaengeAdresse);
+    byte passwordLaengeR = leseByteAusEeprom(passwordLaengeAdresse);
     byte passwortStartAdresseR = ssidStartAdresse + ssidLaengeR + 1;
 
     char ssidR[ssidLaengeR + 1];
-    LeseStringAusEeprom(ssidStartAdresse, ssidLaengeR, ssidR);
+    leseStringAusEeprom(ssidStartAdresse, ssidLaengeR, ssidR);
 
     char passwortR[passwordLaengeR + 1];
-    LeseStringAusEeprom(passwortStartAdresseR, passwordLaengeR, passwortR);
+    leseStringAusEeprom(passwortStartAdresseR, passwordLaengeR, passwortR);
 
     //WLAN gespeichert
     String html = F("<!DOCTYPE html>");
@@ -219,7 +300,8 @@ void handleWlanKonfiguration() {
 
     server.send(200, "text/html", html);
     delay(5000); //server.send bearbeiten
-    while (true) {
+    while (true)
+    {
       delayMicroseconds(1000); //Keine HTTP Anfragen mehr bearbeiten. IC soll ja neu gestartet werden
     }
   }
@@ -252,7 +334,7 @@ void handleWlanKonfiguration() {
   html += newLine;
   html += F("<p>Die SSID und Passwort dürfen jeweils eine Länge von 128 Zeichen nicht überschreiten.</p>");
   html += newLine;
-  html += "<p>" + GetWlanNetzwerke() + "</p>";
+  html += "<p>" + getWlanNetzwerke() + "</p>";
   html += newLine;
   html += F("<fieldset>");
   html += newLine;
@@ -281,52 +363,60 @@ void handleWlanKonfiguration() {
   html += F("</html>");
   html += newLine;
 
-
   server.send(200, "text/html", html);
 }
 
-String GetWlanNetzwerke() {
+String getWlanNetzwerke()
+{
   int numSsid = WiFi.scanNetworks();
-  if (numSsid == -1) {
+  if (numSsid == -1)
+  {
     return "<b>Keine Netzwerke gefunden</b><br>";
   }
   String n = "<b>" + String(numSsid) + " Netzwerke gefunden </b><br>";
-  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
+  for (int thisNet = 0; thisNet < numSsid; thisNet++)
+  {
     n += String(WiFi.SSID(thisNet)) + "<br>";
   }
   return n;
 }
 
-bool SpeichereStringInEeprom(String value, int startAdresse) {
+bool speichereStringInEeprom(String value, int startAdresse)
+{
   EEPROM.begin(eepromUsedBytes);
   int curAdresse = startAdresse;
-  for (int i = 0; i < value.length(); i++) {
+  for (int i = 0; i < value.length(); i++)
+  {
     char curChar = value[i];
     EEPROM.write(curAdresse, curChar);
     curAdresse++;
   }
-  bool success =  EEPROM.commit();
+  bool success = EEPROM.commit();
   EEPROM.end();
   return success;
 }
 
-void LeseStringAusEeprom(int startAdresse, int laenge, char *outResultChar) { //outResultChar Länge = laenge + 1 !!!!
+void leseStringAusEeprom(int startAdresse, int laenge, char *outResultChar)
+{ //outResultChar Länge = laenge + 1 !!!!
   EEPROM.begin(eepromUsedBytes);
   outResultChar[laenge] = '\0'; //Nullterminierung: Wenn laenge 4 ist, geht Array Index von 0-4 (laenge + 1). Dabei ist Index 0-3 EEPROM, Index 4 null-Terminierung
-  for (int i = 0; i < laenge; i++) {
+  for (int i = 0; i < laenge; i++)
+  {
     outResultChar[i] = EEPROM.read(startAdresse + i);
   }
 }
 
-bool SpechereByteInEeprom(byte wert, int adresse) {
+bool spechereByteInEeprom(byte wert, int adresse)
+{
   EEPROM.begin(eepromUsedBytes);
   EEPROM.write(adresse, wert);
-  bool success =  EEPROM.commit();
+  bool success = EEPROM.commit();
   EEPROM.end();
   return success;
 }
 
-byte LeseByteAusEeprom(int adresse) {
+byte leseByteAusEeprom(int adresse)
+{
   EEPROM.begin(eepromUsedBytes);
   return EEPROM.read(adresse);
 }

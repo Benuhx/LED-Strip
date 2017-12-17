@@ -2,5 +2,6 @@
     "board": "esp8266:esp8266:nodemcuv2",
     "configuration": "CpuFrequency=160,UploadSpeed=115200,FlashSize=4M3M",
     "sketch": "LED_Strip.ino",
-    "port": "COM3"
+    "port": "COM3",
+    "output": "../build"
 }
