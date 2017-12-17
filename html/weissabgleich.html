@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <!-- http://ionicons.com/#cdnh-->
+    <meta charset="UTF-8">
+    <title>Weißabgleich</title>
+    <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
+    <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<div class="pure-g">
+    <div class="pure-u-1 pure-u-md-1-1">
+    <h1>Weißabgleich</h1>
+    <p>Rot, Grün und Blau der LEDs leuchten auf der max. Helligkeit. Schieben Sie die Regler so, dass ein natürlich wirkendes Weiß ensteht.</p>
+    <p>Setzen Sie min. 1 Regler auf 9, sonst wird niemals die max Helligkeit erzielt. Je höher die eingstellten Werte, desto heller scheinen die LEDs.</p>
+    <p>Default ist 9:6:2</p>
+    <fieldset>
+        <legend>Wertebereich jeweils von 1 bis 9</legend>
+    <form class="pure-form">
+        Rot <input type="number" min="1" max="9" value="#!String(gRot)!#" name="wrot">
+        Grün <input type="number" min="1" max="9" value="#!String(gGruen)!#" name="wgruen">
+        Blau <input type="number" min="1" max="9" value="#!String(gBlau)!#" name="wblau">
+        <br>
+        <button type="submit" class="pure-button ion-checkmark"> Speichern / Testen</button>
+        <br>
+        <br>
+        <a href="/" class="pure-button ion-close"> Verwerfen</a>
+    </form>
+    </fieldset>
+        <br>
+    </div>
+</div>
+</body>
+</html>
