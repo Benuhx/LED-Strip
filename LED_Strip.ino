@@ -144,7 +144,6 @@ void ledDelay(int ms)
   {
     ms = ms - maxMsDelay * 4;
     delay(maxMsDelay * 3);
-    //FastLED.delay(maxMsDelay);
   }
   if (serverHasBegun)
   {
@@ -306,7 +305,8 @@ void handleWlanKonfiguration()
     }
   }
   //WLAN Daten eingeben
-  String html = "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> <title>WLAN-Konfiguration</title> <link rel=\"stylesheet\" href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link rel=\"stylesheet\" href=\"http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> </head> <body> <div class=\"pure-g\"> <div class=\"pure-u-1 pure-u-md-1-1\"> <h1>LED WLAN Konfiguration</h1> <p>Die SSID und Passwort dürfen jeweils eine Länge von 128 Zeichen nicht überschreiten.</p> <fieldset> <legend>WLAN Zugangsdaten eingeben</legend> <form class=\"pure-form\"> <p>" + getWlanNetzwerke() + "</p> <input type=\"password\" name=\"passwort\" required autofocus placeholder=\"Passwort\"> <br> <button type=\"submit\" class=\"pure-button ion-checkmark-round\"> Bestätigen</button> </form> </fieldset> </div> </div> </body> </html>"; html += newLine;
+  String html = "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> <title>WLAN-Konfiguration</title> <link rel=\"stylesheet\" href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link rel=\"stylesheet\" href=\"http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> </head> <body> <div class=\"pure-g\"> <div class=\"pure-u-1 pure-u-md-1-1\"> <h1>LED WLAN Konfiguration</h1> <p>Die SSID und Passwort dürfen jeweils eine Länge von 128 Zeichen nicht überschreiten.</p> <fieldset> <legend>WLAN Zugangsdaten eingeben</legend> <form class=\"pure-form\"> <p>" + getWlanNetzwerke() + "</p> <input type=\"password\" name=\"passwort\" required autofocus placeholder=\"Passwort\"> <br> <button type=\"submit\" class=\"pure-button ion-checkmark-round\"> Bestätigen</button> </form> </fieldset> </div> </div> </body> </html>";
+  html += newLine;
 
   server.send(200, "text/html", html);
 }
