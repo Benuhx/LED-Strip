@@ -4,8 +4,8 @@
 
 //#define FASTLED_ESP8266_NODEMCU_PIN_ORDER -> dann geht 3 statt D3
 #define FASTLED_ESP8266_RAW_PIN_ORDER //-> dann geht D3 statt 3
-//#define FASTLED_ALLOW_INTERRUPTS 0
-#define FASTLED_INTERRUPT_RETRY_COUNT 1
+#define FASTLED_ALLOW_INTERRUPTS 0
+// #define FASTLED_INTERRUPT_RETRY_COUNT 1
 #include "FastLED.h"
 #include <EEPROM.h>
 #include <ESP8266WiFi.h>
@@ -17,7 +17,7 @@
 #define RGB_ORDER GRB
 const byte ANZAHL_LEDS = 120;
 const byte PIN_LED_DATA = D3;
-const byte LED_DEFAULT_HELLIGKEIT = 15;
+const byte LED_DEFAULT_HELLIGKEIT = 255;
 //ENDE Einstellungen
 
 //## WiFi
@@ -38,12 +38,11 @@ const byte eepromUsedBytes = 195;
 CRGB leds[ANZAHL_LEDS];
 
 void setup() {
+  MyDelay(1000);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
-  FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
-  for (int i = 0; i < ANZAHL_LEDS; i++) {
-    leds[i].setRGB(0, 0, 0);
-  }
-  FastLED.show();
+  FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);  
+  ResetLED();
+  FastLED.show();  
 
   //WLAN Zugangsdaten aus EEPROM lesen
   byte ssidLaenge = LeseByteAusEeprom(ssidLaengeAdresse);
@@ -90,28 +89,53 @@ void setup() {
 }
 
 void loop() {
-  server.handleClient();
-  yield();
+  //FastLED.delay(200);
+  RunTestmode(); 
+  MyDelay(3000);
+  
+  
+  //server.handleClient();
+  //yield();
   //RunTestmode();
+}
+
+void MyDelay(int ms)  {
+  FastLED.delay(20);
+  int hf = ms / 2 - 40;
+  yield();
+  FastLED.delay(hf);
+  delay(hf);
+  yield();
+  FastLED.delay(20);
+  FastLED.show();
 }
 
 void RunTestmode() {
   RunTestmodeWithColor(255, 0, 0);
+  ResetLED();
   RunTestmodeWithColor(0, 255, 0);
+  ResetLED();
   RunTestmodeWithColor(0, 0, 255);
+  ResetLED();
 }
 
 void RunTestmodeWithColor(byte r, byte g, byte b) {
   for (byte i = 0; i < ANZAHL_LEDS; i++) {
-    if (i == 0) {
+    /*if (i == 0) {
       leds[ANZAHL_LEDS - 1].setRGB(0, 0, 0);
     } else {
       leds[i - 1].setRGB(0, 0, 0);
-    }
+    }*/
     leds[i].setRGB(r, g, b);
     FastLED.show();
-    delay(300);
+    delay(150);    
   }
+}
+
+void ResetLED() {
+  for (int i = 0; i < ANZAHL_LEDS; i++) {
+    leds[i].setRGB(0, 0, 0);
+  }  
 }
 
 void handleWlanKonfiguration() {
