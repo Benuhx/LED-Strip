@@ -306,62 +306,7 @@ void handleWlanKonfiguration()
     }
   }
   //WLAN Daten eingeben
-  String html = F("<!DOCTYPE html>");
-  html += newLine;
-  html += F("<html lang=\"de\">");
-  html += newLine;
-  html += F("<head>");
-  html += newLine;
-  html += F("<meta charset=\"UTF-8\">");
-  html += newLine;
-  html += F("<title>WLAN-Konfiguration</title>");
-  html += newLine;
-  html += F("<link rel=\"stylesheet\" href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\">");
-  html += newLine;
-  html += F("<link rel=\"stylesheet\" href=\"http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css\">");
-  html += newLine;
-  html += F("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">");
-  html += newLine;
-  html += F("</head>");
-  html += newLine;
-  html += F("<body>");
-  html += newLine;
-  html += F("<div class=\"pure-g\">");
-  html += newLine;
-  html += F("<div class=\"pure-u-1 pure-u-md-1-1\">");
-  html += newLine;
-  html += F("<h1>LED Strip</h1>");
-  html += newLine;
-  html += F("<p>Die SSID und Passwort dürfen jeweils eine Länge von 128 Zeichen nicht überschreiten.</p>");
-  html += newLine;
-  html += "<p>" + getWlanNetzwerke() + "</p>";
-  html += newLine;
-  html += F("<fieldset>");
-  html += newLine;
-  html += F("<legend>WLAN Zugangsdaten eingeben</legend>");
-  html += newLine;
-  html += F("<form class=\"pure-form\">");
-  html += newLine;
-  html += F("<input type=\"text\" name=\"ssid\" required autofocus placeholder=\"SSID\">");
-  html += newLine;
-  html += F("<input type=\"password\" name=\"passwort\" required autofocus placeholder=\"Passwort\">");
-  html += newLine;
-  html += F("<br>");
-  html += newLine;
-  html += F("<button type=\"submit\" class=\"pure-button ion-checkmark-round\"> Bestätigen</button>");
-  html += newLine;
-  html += F("</form>");
-  html += newLine;
-  html += F("</fieldset>");
-  html += newLine;
-  html += F("</div>");
-  html += newLine;
-  html += F("</div>");
-  html += newLine;
-  html += F("</body>");
-  html += newLine;
-  html += F("</html>");
-  html += newLine;
+  String html = "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> <title>WLAN-Konfiguration</title> <link rel=\"stylesheet\" href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link rel=\"stylesheet\" href=\"http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css\"> <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"> </head> <body> <div class=\"pure-g\"> <div class=\"pure-u-1 pure-u-md-1-1\"> <h1>LED WLAN Konfiguration</h1> <p>Die SSID und Passwort dürfen jeweils eine Länge von 128 Zeichen nicht überschreiten.</p> <fieldset> <legend>WLAN Zugangsdaten eingeben</legend> <form class=\"pure-form\"> <p>" + getWlanNetzwerke() + "</p> <input type=\"password\" name=\"passwort\" required autofocus placeholder=\"Passwort\"> <br> <button type=\"submit\" class=\"pure-button ion-checkmark-round\"> Bestätigen</button> </form> </fieldset> </div> </div> </body> </html>"; html += newLine;
 
   server.send(200, "text/html", html);
 }
@@ -373,11 +318,12 @@ String getWlanNetzwerke()
   {
     return "<b>Keine Netzwerke gefunden</b><br>";
   }
-  String n = "<b>" + String(numSsid) + " Netzwerke gefunden </b><br>";
+  String n = "<b>" + String(numSsid) + " Netzwerke gefunden </b><br><select name=\"ssid\">";
   for (int thisNet = 0; thisNet < numSsid; thisNet++)
   {
-    n += String(WiFi.SSID(thisNet)) + "<br>";
+    n += "<option>" + String(WiFi.SSID(thisNet)) + "</option>";
   }
+  n += "</select>";
   return n;
 }
 
