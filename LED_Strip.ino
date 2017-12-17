@@ -40,9 +40,9 @@ CRGB leds[ANZAHL_LEDS];
 void setup() {
   MyDelay(1000);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
-  FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);  
+  FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   ResetLED();
-  FastLED.show();  
+  FastLED.show();
 
   //WLAN Zugangsdaten aus EEPROM lesen
   byte ssidLaenge = LeseByteAusEeprom(ssidLaengeAdresse);
@@ -90,10 +90,10 @@ void setup() {
 
 void loop() {
   //FastLED.delay(200);
-  RunTestmode(); 
+  RunTestmode();
   MyDelay(3000);
-  
-  
+
+
   //server.handleClient();
   //yield();
   //RunTestmode();
@@ -128,14 +128,14 @@ void RunTestmodeWithColor(byte r, byte g, byte b) {
     }*/
     leds[i].setRGB(r, g, b);
     FastLED.show();
-    delay(150);    
+    delay(150);
   }
 }
 
 void ResetLED() {
   for (int i = 0; i < ANZAHL_LEDS; i++) {
     leds[i].setRGB(0, 0, 0);
-  }  
+  }
 }
 
 void handleWlanKonfiguration() {
@@ -285,7 +285,7 @@ void handleWlanKonfiguration() {
   server.send(200, "text/html", html);
 }
 
-String GetWlanNetzwerke() {  
+String GetWlanNetzwerke() {
   int numSsid = WiFi.scanNetworks();
   if (numSsid == -1) {
     return "<b>Keine Netzwerke gefunden</b><br>";
