@@ -1,7 +1,7 @@
 {
     "configurations": [
         {
-            "name": "Win32",            
+            "name": "Win32",
             "includePath": [
                 "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\variants\\nodemcu",
                 "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\cores\\esp8266",
@@ -17,7 +17,7 @@
                 "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\tools\\xtensa-lx106-elf-gcc\\1.20.0-26-gb404fb9-2\\xtensa-lx106-elf\\include\\c++\\4.8.2\\xtensa-lx106-elf",
                 "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\libraries\\ESP8266WebServer\\src"
             ],
-            "browse": {                
+            "browse": {
                 "limitSymbolsToIncludedHeaders": false,
                 "path": [
                     "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\variants\\nodemcu",
@@ -35,7 +35,7 @@
                     "C:\\Users\\janni\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.3.0\\libraries\\ESP8266WebServer\\src"
                 ]
             },
-            "intelliSenseMode": "msvc-x64"
+            "intelliSenseMode": "clang-x64"
         }
     ],
     "version": 3
