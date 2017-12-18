@@ -3,6 +3,8 @@
         "functional": "cpp",
         "ratio": "cpp",
         "type_traits": "cpp",
-        "cstdlib": "cpp"
+        "cstdlib": "cpp",
+        "iosfwd": "cpp",
+        "limits": "cpp"
     }
 }

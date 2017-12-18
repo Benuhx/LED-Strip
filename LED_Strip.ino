@@ -24,18 +24,44 @@ const byte LED_DEFAULT_HELLIGKEIT = 60;
 
 //## WiFi
 const String newLine = "\n";
-const byte connectionTimeoutInSekunden = 10;
+const byte connectionTimeoutInSekunden = 15;
 // MDNSResponder mdns;
 bool serverHasBegun;
 bool wifiConfigMode;
 ESP8266WebServer server(80);
 //## ENDE WiFi
 
+//## RGB Slots
+byte slot1r;
+byte slot1g;
+byte slot1b;
+
+byte slot2r;
+byte slot2g;
+byte slot2b;
+
+byte slot3r;
+byte slot3g;
+byte slot3b;
+// ENDE RGB Slots
+
 //## EEPROM Adressen
 const byte ssidLaengeAdresse = 0;
 const byte passwordLaengeAdresse = 1;
 const byte ssidStartAdresse = passwordLaengeAdresse + 1;
 byte passwortStartAdresse;
+
+int slot1rAdresse;
+int slot1gAdresse;
+int slot1bAdresse;
+
+int slot2rAdresse;
+int slot2gAdresse;
+int slot2bAdresse;
+
+int slot3rAdresse;
+int slot3gAdresse;
+int slot3bAdresse;
 const byte eepromUsedBytes = 195;
 //##ENDE EEPROM Adressen
 
@@ -53,13 +79,17 @@ void setup() {
   byte ssidLaenge = leseByteAusEeprom(ssidLaengeAdresse);
   byte passwordLaenge = leseByteAusEeprom(passwordLaengeAdresse);
   byte passwortStartAdresse = ssidStartAdresse + ssidLaenge + 1;
-
   char ssid[ssidLaenge + 1];
   leseStringAusEeprom(ssidStartAdresse, ssidLaenge, ssid);
 
   char passwort[passwordLaenge + 1];
   leseStringAusEeprom(passwortStartAdresse, passwordLaenge, passwort);
   // ENDE WLAN Zugangsdaten aus EEPROM lesen
+
+  // RGB Slots lesen
+  berechneRgbSlotAdressen(passwortStartAdresse + passwordLaenge + 1);
+  leseRgbWerteAusSlots();
+  // Ende RGB Slots
 
   WiFi.mode(WIFI_STA);
   WiFi.hostname("ESP8266LedStrip");
@@ -103,6 +133,8 @@ void setup() {
   } else {
     server.on("/", handleIndex);
     server.on("/wlan", handleWlanKonfiguration);
+    server.on("/ledTestModus", handleLedTestModus);
+    server.on("/farbeSpeichern", handleFarbeSpeichern);
   }
 
   server.begin();
@@ -116,7 +148,6 @@ void loop() {
   if (wifiConfigMode) {
     return;
   }
-  runTestmode();
   ledDelay(3000);
   if (serverHasBegun) {
     server.handleClient();
@@ -136,7 +167,37 @@ void ledDelay(int ms) {
   }
 }
 
+void berechneRgbSlotAdressen(int startAdresse) {
+  slot1rAdresse = startAdresse;
+  slot1gAdresse = slot1rAdresse + 1;
+  slot1bAdresse = slot1gAdresse + 1;
+
+  slot2rAdresse = slot1bAdresse + 1;
+  slot2gAdresse = slot2rAdresse + 1;
+  slot2bAdresse = slot2gAdresse + 1;
+
+  slot3rAdresse = slot2bAdresse + 1;
+  slot3gAdresse = slot3rAdresse + 1;
+  slot3bAdresse = slot3gAdresse + 1;
+}
+
+void leseRgbWerteAusSlots() {
+  slot1r = leseByteAusEeprom(slot1rAdresse);
+  slot1g = leseByteAusEeprom(slot1gAdresse);
+  slot1b = leseByteAusEeprom(slot1bAdresse);
+
+  slot2r = leseByteAusEeprom(slot2rAdresse);
+  slot2g = leseByteAusEeprom(slot2gAdresse);
+  slot2b = leseByteAusEeprom(slot2bAdresse);
+
+  slot3r = leseByteAusEeprom(slot3rAdresse);
+  slot3g = leseByteAusEeprom(slot3gAdresse);
+  slot3b = leseByteAusEeprom(slot3bAdresse);
+}
+
 void runTestmode() {
+  resetLedArray();
+  FastLED.setBrightness(255);
   runTestmodeWithColor(255, 0, 0);
   resetLedArrayAndShow();
   runTestmodeWithColor(0, 255, 0);
@@ -149,8 +210,12 @@ void runTestmodeWithColor(byte r, byte g, byte b) {
   for (byte i = 0; i < ANZAHL_LEDS; i++) {
     leds[i].setRGB(r, g, b);
     FastLED.show();
-    ledDelay(150);
+    ledDelay(100);
   }
+}
+
+void resetLedArray() {
+  setLedArray(0, 0, 0);
 }
 
 void resetLedArrayAndShow() {
@@ -189,44 +254,254 @@ void blinkCurIpDigit(byte pos, unsigned int num) {
   ledDelay(1000);
 }
 
+int ermittleEchteRgbWerte(int farbenCode, bool* converterErfolgreich) {
+  if (farbenCode >= 100 && farbenCode <= 255) {
+    // Ist schon der echte RGB-Wert
+    return farbenCode;
+  } else if (farbenCode == 300) {
+    // Entspricht 0
+    return 0;
+  } else if (farbenCode > 300 && farbenCode <= 399) {
+    // Echter RGB ist zwischen 1 und 99.
+    return farbenCode - 300;
+  }
+  *converterErfolgreich = false;
+  return 0;  // Fehler!
+}
+
+byte countDigits(int num) {
+  byte count = 0;
+  while (num) {
+    num = num / 10;
+    count++;
+  }
+  return count;
+}
+
 void handleIndex() {
+  int serverArgs = server.args();
+  if (serverArgs == 4) {
+    byte rot = (byte)server.arg("rot").toInt();
+    byte gruen = (byte)server.arg("gruen").toInt();
+    byte blau = (byte)server.arg("blau").toInt();
+    byte farbeAnzeigen = (byte)server.arg("b1").toInt();
+    if (farbeAnzeigen == 1) {
+      // Manueller RGB Wert
+      FastLED.setBrightness(255);
+      setLedArrayAndShow(rot, gruen, blau);
+    } else {
+      // Farbe speichern
+      server.sendHeader(
+          "Location",
+          String("/farbeSpeichern?rot=" + String(rot) +
+                 "&gruen=" + String(gruen) + "&blau=" + String(blau) + "&b2=1"),
+          true);
+      server.send(303, "text/plain", "");
+    }
+  } else if (serverArgs == 2) {
+    // Definierter RGB Wert. Entweder Slot oder hardcoded
+    int farbeCode = server.arg("sColor").toInt();
+    float helligkeit = server.arg("sHelligkeit").toInt();
+    // Heligkeit ist Prozentual von 0 bis 100
+    // setBrightness erwartet 0 bis 255
+    helligkeit = 255 * (helligkeit / 100);
+    FastLED.setBrightness((byte)helligkeit);
+    byte digits = countDigits(farbeCode);
+    if (digits == 2) {
+      // Eigener Slot. Zum Beispiel 91 für Slot 1, 92 für Slot 2....
+      byte slotNummer = farbeCode % 10;
+      byte r;
+      byte g;
+      byte b;
+      switch (slotNummer) {
+        case 1:
+          r = slot1r;
+          g = slot1g;
+          b = slot1b;
+          break;
+        case 2:
+          r = slot2r;
+          g = slot2g;
+          b = slot2b;
+          break;
+        case 3:
+          r = slot3r;
+          g = slot3g;
+          b = slot3b;
+          break;
+        default:
+          return;
+      }
+      setLedArrayAndShow(r, g, b);
+    } else {
+      // Vordefinierter, hardcoded Farbcode. 300300300 für 0 0 0 oder 120320340 für 120 20 40
+      if (digits != 9) {
+        server.send(501, "text/plain",
+                    "Parameter sColor ist falsch. Muss 9-stellig sein!");
+        return;
+      }
+      int rot = farbeCode / 1000000;
+      int gruen = (farbeCode % 1000000) / 1000;
+      int blau = farbeCode % 1000;
+      bool converterErfolgreich = true;
+      rot = ermittleEchteRgbWerte(rot, &converterErfolgreich);
+      gruen = ermittleEchteRgbWerte(gruen, &converterErfolgreich);
+      blau = ermittleEchteRgbWerte(blau, &converterErfolgreich);
+      if (!converterErfolgreich) {
+        server.send(501, "text/html",
+                    "ermittleEchteRgbWerte ist fehlgeschlagen");
+      }
+      setLedArrayAndShow(rot, gruen, blau);
+    }
+  }
+  String html = F(
+      "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> "
+      "<title>Benedikts LED Konfiguration</title> <link rel=\"stylesheet\" "
+      "href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link "
+      "rel=\"stylesheet\" "
+      "href=\"http://code.ionicframework.com/ionicons/2.0.1/css/"
+      "ionicons.min.css\"> <meta name=\"viewport\" "
+      "content=\"width=device-width, initial-scale=1\"> </head> <body> "
+      "<h1>Benedikts LED Konfiguration</h1> <div class=\"pure-g\"> <div "
+      "class=\"pure-u-1 pure-u-md-1-1\"> <h2>Farbe ändern</h2> <fieldset> "
+      "<legend>Vordefinierte Farbe zeigen</legend> <form class=\"pure-form\"> "
+      "<select name=\"sColor\"> <option value=\"300300300\">LEDs "
+      "ausschalten</option> <option value=\"255255255\">Weiß</option> <option "
+      "value=\"255220360\">warmes Weiß</option> <option "
+      "value=\"255300300\">Rot</option> <option "
+      "value=\"300255300\">Grün</option> <option "
+      "value=\"300300255\">Blau</option> <option "
+      "value=\"316378139\">gemildertes Blau</option> <option "
+      "value=\"365105225\">royales Blau</option> <option "
+      "value=\"300300128\">navy Blau</option> <option "
+      "value=\"300134139\">türkises Blau</option> <option "
+      "value=\"255320300\">warmes Rot</option> <option "
+      "value=\"220334301\">Ziegelstein Rot</option> <option "
+      "value=\"255380300\">Orange</option> <option "
+      "value=\"165342342\">Lila</option> <option value=\"255369319\">leichtes "
+      "Rosa</option> <option value=\"127255340\">aqua Grün</option> <option "
+      "value=\"300100300\">dunkles Grün</option> <option "
+      "value=\"334150310\">Wald Grün</option> <option "
+      "value=\"255220300\">Gelb</option> <option value=\"139101308\">dunkles "
+      "Gelb</option> <option value=\"255215300\">Gold</option> <option "
+      "value=\"91\">Slot 1 (eigene Farbe)</option> <option value=\"92\">Slot 2 "
+      "(eigene Farbe)</option> <option value=\"93\">Slot 3 (eigene "
+      "Farbe)</option> </select> <br> <input type=\"number\" min=\"0\" "
+      "max=\"100\" name=\"sHelligkeit\" id=\"1\" autocomplete=\"off\" "
+      "placeholder=\"Helligkeit in Prozent\" required> <br> <button "
+      "type=\"submit\" class=\"pure-button ion-ios-pulse-strong\"> LEDs "
+      "schalten</button> </form> </fieldset> <br> <fieldset> <legend>Eigene "
+      "RGB-Farbe definieren</legend> <form class=\"pure-form\"> <input "
+      "type=\"number\" name=\"rot\" autocomplete=\"off\" placeholder=\"Rot (0 "
+      "bis 255)\" min=\"0\" max=\"255\" required> <input type=\"number\" "
+      "name=\"gruen\" autocomplete=\"off\" placeholder=\"Grün (0 bis 255)\" "
+      "min=\"0\" max=\"255\" required> <input type=\"number\" name=\"blau\" "
+      "autocomplete=\"off\" placeholder=\"Blau (0 bis 255)\" min=\"0\" "
+      "max=\"255\" required> <br> <br> <button name=\"b1\" type=\"submit\" "
+      "value=\"1\" class=\"pure-button ion-ios-pulse-strong\"> LEDs "
+      "schalten</button> oder <button name=\"b2\" type=\"submit\" value=\"1\" "
+      "class=\"pure-button ion-android-cloud-done\"> Dauerhaft "
+      "speichern</button> </form> </fieldset> </div> <div class=\"pure-u-1 "
+      "pure-u-md-1-1\"> <h2>Einstellungen</h2> <p> <a href=\"/wlan\" "
+      "class=\"pure-button\"> <i class=\"ion-wifi\"></i> WLAN </a> <a "
+      "href=\"/ledTestModus\" class=\"pure-button\"> <i "
+      "class=\"ion-ios-analytics-outline\"></i> LED Testmodus </a> </p> </div> "
+      "<div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Gespeicherte Farben</h2> "
+      "<table class=\"pure-table pure-table-horizontal\"> <thead> <tr> "
+      "<th>Slot</th> <th>Rot</th> <th>Grün</th> <th>Blau</th> </tr> </thead> "
+      "<tbody> <tr> <td>Slot 1</td> <td>");
+  html += String(slot1r);
+  html += F("</td> <td>");
+  html += String(slot1g);
+  html += F("</td> <td>");
+  html += String(slot1b);
+  html += F("</td> </tr> <tr> <td>Slot 2</td> <td>");
+  html += String(slot2r);
+  html += F("</td> <td>");
+  html += String(slot2g);
+  html += F("</td> <td>");
+  html += String(slot2b);
+  html += F("</td> </tr> <tr> <td>Slot 3</td> <td>");
+  html += String(slot3r);
+  html += F("</td> <td>");
+  html += String(slot3g);
+  html += F("</td> <td>");
+  html += String(slot3b);
+  html +=
+      F("</td> </tr> </tbody> </table> </div> <div class=\"pure-u-1 "
+        "pure-u-md-1-1\"> <h2>Status</h2> <p>");
+  html += String(ESP.getFreeHeap());
+  html += F(" freier Heap</p> </div> </div> </body> </html>");
+
+  server.send(200, "text/html", html);
+}
+
+void handleLedTestModus() {
+  String html = F(
+      "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> "
+      "<link rel=\"stylesheet\" "
+      "href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link "
+      "rel=\"stylesheet\" "
+      "href=\"http://code.ionicframework.com/ionicons/2.0.1/css/"
+      "ionicons.min.css\"> <meta name=\"viewport\" "
+      "content=\"width=device-width, initial-scale=1\"> <title>LED "
+      "Testmodus</title> </head> <body> <div class=\"pure-g\"> <div "
+      "class=\"pure-u-1 pure-u-md-1-1\"> <h1>LED Testmodus</h1> <p>Die LEDs "
+      "blinken gerade nacheinannder in jeder Farbe. Zuerst rot, dann grün und "
+      "dann blau</p> <p>Nach dem Druchlauf bleiben die LEDs deaktiviert</p> <i "
+      "class=\"ion-android-happy\"></i> </div> </div> </body> </html>");
+  server.send(200, "text/html", html);
+  ledDelay(500);
+  runTestmode();
+}
+
+void handleFarbeSpeichern() {
+  byte rot = (byte)server.arg("rot").toInt();
+  byte gruen = (byte)server.arg("gruen").toInt();
+  byte blau = (byte)server.arg("blau").toInt();
+  byte farbeBestaetigen = (byte)server.arg("b2").toInt();
+  byte slot = (byte)server.arg("slot").toInt();
+  if (farbeBestaetigen == 0) {
+    speichereRgbInEEprom(rot, gruen, blau, slot);
+    server.sendHeader("Location", String("/"), true);
+    server.send(303, "text/plain", "");
+    return;
+  }
   String html =
       F("<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> "
-        "<title>Benedikts LED Konfiguration</title> <link rel=\"stylesheet\" "
+        "<link rel=\"stylesheet\" "
         "href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link "
         "rel=\"stylesheet\" "
         "href=\"http://code.ionicframework.com/ionicons/2.0.1/css/"
         "ionicons.min.css\"> <meta name=\"viewport\" "
-        "content=\"width=device-width, initial-scale=1\"> </head> <body> "
-        "<h1>Benedikts LED Konfiguration</h1> <div class=\"pure-g\"> <div "
-        "class=\"pure-u-1 pure-u-md-1-1\"> <h2>Farbe ändern</h2> <fieldset> "
-        "<legend>Vordefinierte Farbe zeigen</legend> <form "
-        "class=\"pure-form\"> <select name=\"sColor\"> <option name=\"sAus\" "
-        "value=\"300300300\">LEDs ausschalten</option> <option name=\"sRot\" "
-        "value=\"255300300\">Rot</option> <option name=\"sGruen\" "
-        "value=\"300255300\">Grün</option> <option name=\"sBlau\" "
-        "value=\"300300255\">Blau</option> <option name=\"sWeiss\" "
-        "value=\"255255255\">Weiß</option> <option name=\"sOrange\" "
-        "value=\"255165300\">Orange</option> </select> <br> <input "
-        "type=\"number\" min=\"0\" max=\"100\" name=\"sHelligkeit\" id=\"1\" "
-        "autocomplete=\"off\" placeholder=\"Helligkeit in Prozent\" required> "
-        "<br> <button type=\"submit\" class=\"pure-button "
-        "ion-ios-pulse-strong\"> LEDs schalten</button> </form> </fieldset> "
-        "<br> <fieldset> <legend>RGB-Farbe definieren</legend> <form "
-        "class=\"pure-form\"> <input type=\"number\" name=\"rot\" "
-        "autocomplete=\"off\" placeholder=\"Rot\" min=\"0\" max=\"255\" "
-        "required> <input type=\"number\" name=\"gruen\" autocomplete=\"off\" "
-        "placeholder=\"Grün\" min=\"0\" max=\"255\" required> <input "
-        "type=\"number\" name=\"blau\" autocomplete=\"off\" "
-        "placeholder=\"Blau\" min=\"0\" max=\"255\" required> <br> <button "
-        "type=\"submit\" class=\"pure-button ion-ios-pulse-strong\"> LEDs "
-        "schalten</button> </form> </fieldset> </div> <div class=\"pure-u-1 "
-        "pure-u-md-1-1\"> <h2>Einstellungen</h2> <p> <a href=\"/wlan\" "
-        "class=\"pure-button\"> <i class=\"ion-wifi\"></i> WLAN </a> </p> "
-        "</div> <div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Status</h2> <p>");
-  html += String(ESP.getFreeHeap());
-  html += F(" freier Heap</p> </div> </div> </body> </html>");
-
+        "content=\"width=device-width, initial-scale=1\"> <title>Neue Farbe "
+        "speichern</title> </head> <body> <div class=\"pure-g\"> <div "
+        "class=\"pure-u-1 pure-u-md-1-1\"> <h1>Neue Farbe speichern</h1> "
+        "<p>Deine Farbe wird gerade angezeigt. Die Werte sind: </p> <table "
+        "class=\"pure-table pure-table-horizontal\"> <thead> <tr> <th>Rot</th> "
+        "<th>Grün</th> <th>Blau</th> </tr> </thead> <tbody> <tr> <td>");
+  html += String(rot);
+  html += F("</td> <td>");
+  html += String(gruen);
+  html += F("</td> <td>");
+  html += String(blau);
+  html +=
+      F("</td> </tr> </tbody> </table> <fieldset> <form class=\"pure-form\"> "
+        "<legend>Welcher Speicherslot soll genutzt werden? Falls in dem "
+        "ausgewählten Slot bereits eine Farbe gespeichert ist, wird diese "
+        "überschrieben</legend> <select name=\"slot\"> <option "
+        "value=\"1\">Slot 1</option> <option value=\"2\">Slot 2</option> "
+        "<option value=\"3\">Slot 3</option> </select> <br> <br> <input "
+        "type=\"hidden\" name=\"rot\" value=\"");
+  html += String(rot);
+  html += F("\"> <input type=\"hidden\" name=\"gruen\" value=\"");
+  html += String(gruen);
+  html += F("\"> <input type=\"hidden\" name=\"blau\" value=\"");
+  html += String(blau);
+  html +=
+      F("\"> <input type=\"hidden\" name=\"b2\" value=\"0\"> <button "
+        "type=\"submit\" class=\"pure-button ion-android-cloud-done\"> Farbe "
+        "speichern</button> </form> </fieldset> </div> </div> </body> </html>");
   server.send(200, "text/html", html);
 }
 
@@ -325,6 +600,35 @@ String getWlanNetzwerke() {
   }
   n += "</select>";
   return n;
+}
+
+void speichereRgbInEEprom(byte r, byte g, byte b, byte slot) {
+  int eepromR;
+  int eepromG;
+  int eepromB;
+  switch (slot) {
+    case 1:
+      eepromR = slot1rAdresse;
+      eepromG = slot1gAdresse;
+      eepromB = slot1bAdresse;
+      break;
+    case 2:
+      eepromR = slot2rAdresse;
+      eepromG = slot2gAdresse;
+      eepromB = slot2bAdresse;
+      break;
+    case 3:
+      eepromR = slot3rAdresse;
+      eepromG = slot3gAdresse;
+      eepromB = slot3bAdresse;
+      break;
+    default:
+      return;
+  }
+  spechereByteInEeprom(r, eepromR);
+  spechereByteInEeprom(g, eepromG);
+  spechereByteInEeprom(b, eepromB);
+  leseRgbWerteAusSlots();
 }
 
 bool speichereStringInEeprom(String value, int startAdresse) {
