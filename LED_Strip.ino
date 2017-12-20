@@ -25,9 +25,11 @@ const byte LED_DEFAULT_HELLIGKEIT = 60;
 //## WiFi
 const String newLine = "\n";
 const byte connectionTimeoutInSekunden = 15;
-// MDNSResponder mdns;
 bool serverHasBegun;
 bool wifiConfigMode;
+const byte MAX_LAENGE_SSID_PASS = 128;
+char ssid[MAX_LAENGE_SSID_PASS];
+char passwort[MAX_LAENGE_SSID_PASS];
 ESP8266WebServer server(80);
 //## ENDE WiFi
 
@@ -78,11 +80,10 @@ void setup() {
   // WLAN Zugangsdaten aus EEPROM lesen
   byte ssidLaenge = leseByteAusEeprom(ssidLaengeAdresse);
   byte passwordLaenge = leseByteAusEeprom(passwordLaengeAdresse);
+
   byte passwortStartAdresse = ssidStartAdresse + ssidLaenge + 1;
-  char ssid[ssidLaenge + 1];
   leseStringAusEeprom(ssidStartAdresse, ssidLaenge, ssid);
 
-  char passwort[passwordLaenge + 1];
   leseStringAusEeprom(passwortStartAdresse, passwordLaenge, passwort);
   // ENDE WLAN Zugangsdaten aus EEPROM lesen
 
@@ -91,9 +92,7 @@ void setup() {
   leseRgbWerteAusSlots();
   // Ende RGB Slots
 
-  WiFi.mode(WIFI_STA);
-  WiFi.hostname("ESP8266LedStrip");
-  WiFi.begin(ssid, passwort);
+  connectToWiFi();
   unsigned long timeout = millis() + (connectionTimeoutInSekunden * 1000);
   wifiConfigMode = false;
   byte curLed = 0;
@@ -148,10 +147,28 @@ void loop() {
   if (wifiConfigMode) {
     return;
   }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    yield();
+    connectToWiFi();
+    yield();
+    delay(3000);
+    yield();
+    if (WiFi.status() == WL_CONNECTED) {
+      server.begin();
+    }
+  }
+
   ledDelay(3000);
   if (serverHasBegun) {
     server.handleClient();
   }
+}
+
+void connectToWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.hostname("ESP8266LedStrip");
+  WiFi.begin(ssid, passwort);
 }
 
 void ledDelay(int ms) {
@@ -334,7 +351,8 @@ void handleIndex() {
       }
       setLedArrayAndShow(r, g, b);
     } else {
-      // Vordefinierter, hardcoded Farbcode. 300300300 für 0 0 0 oder 120320340 für 120 20 40
+      // Vordefinierter, hardcoded Farbcode. 300300300 für 0 0 0 oder 120320340
+      // für 120 20 40
       if (digits != 9) {
         server.send(501, "text/plain",
                     "Parameter sColor ist falsch. Muss 9-stellig sein!");
