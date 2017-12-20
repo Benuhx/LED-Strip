@@ -52,6 +52,7 @@
                     <br>
                     <input type="number" min="0" max="100" name="sHelligkeit" id="1" autocomplete="off" placeholder="Helligkeit in Prozent" required>
                     <br>
+                    <br>
                     <button type="submit" class="pure-button ion-ios-pulse-strong"> LEDs schalten</button>
                 </form>
             </fieldset>
@@ -73,14 +74,26 @@
         <!--Einstellungen-->
         <div class="pure-u-1 pure-u-md-1-1">
             <h2>Einstellungen</h2>
-            <p>
-                <a href="/wlan" class="pure-button">
-                    <i class="ion-wifi"></i> WLAN
-                </a>
-                <a href="/ledTestModus" class="pure-button">
-                    <i class="ion-ios-analytics-outline"></i> LED Testmodus
-                </a>
-            </p>
+            <fieldset>
+                <legend>Schwellwert für Magnetsensor</legend>
+                <p>Wenn die Aktion des Magnetsensors oft unerwartet ausgeführt wird, lässt sich hier der Schwellwert erhöhen. Mit 0 lässt er sich permanent deaktivieren</p>
+                <form class="pure-form">
+                    <input type="number" name="hS" autocomplete="off" placeholder="0 bis 255" min="0" max="255" required> <span>Aktueller Wert: #!String(hallDiff)!#, Standard: 10</span>
+                    <br>
+                    <br>
+                    <button type="submit" class="pure-button ion-checkmark-round"> Speichern</button>
+                </form>
+            </fieldset>
+            <br>
+            <fieldset>
+                    <legend>Weitere Einstellungsseiten</legend>
+                    <a href="/wlan" class="pure-button">
+                        <i class="ion-wifi"></i> WLAN
+                    </a>
+                    <a href="/ledTestModus" class="pure-button">
+                        <i class="ion-ios-analytics-outline"></i> LED Testmodus
+                    </a>
+                </fieldset>
         </div>
         <div class="pure-u-1 pure-u-md-1-1">
             <h2>Gespeicherte Farben</h2>
@@ -118,6 +131,7 @@
         <div class="pure-u-1 pure-u-md-1-1">
             <h2>Status</h2>
             <p>#!String(ESP.getFreeHeap())!# freier Heap</p>
+            <p>Aktuelles magnetisches Feld: <b>#!String(aktuellerHallWert)!#</b>. Der beim Booten gemessene Wert liegt bei <b>#!String(kalibrierterHallWert)!#</b>. Die Aktion wird bei einem Wert von +- <b>#!String(hallDiff)!#</b> Differenz vom beim Booten gemessenem Wert ausgeführt</p>
         </div>
     </div>
 </body>

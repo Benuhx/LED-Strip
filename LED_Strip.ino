@@ -18,9 +18,16 @@
 #define RGB_ORDER GRB
 const byte ANZAHL_LEDS = 120;
 const byte PIN_LED_DATA = D3;
-const byte PIN_IP_BLINK = D7;
+const byte PIN_HALL_SENSOR = A0;
 const byte LED_DEFAULT_HELLIGKEIT = 60;
+const byte ANZAHL_HALL_MESSUNGEN = 3;
 // ENDE Einstellungen
+
+// Hall Sensor
+int kalibrierterHallWert;
+int aktuellerHallWert;
+byte hallDiff;
+//
 
 //## WiFi
 const String newLine = "\n";
@@ -64,6 +71,8 @@ int slot2bAdresse;
 int slot3rAdresse;
 int slot3gAdresse;
 int slot3bAdresse;
+
+int hallDiffAdresse;
 const byte eepromUsedBytes = 195;
 //##ENDE EEPROM Adressen
 
@@ -72,7 +81,8 @@ CRGB leds[ANZAHL_LEDS];
 void setup() {
   serverHasBegun = false;
   ledDelay(1000);
-  pinMode(PIN_IP_BLINK, INPUT);
+  pinMode(PIN_HALL_SENSOR, INPUT);
+  kalibrierterHallWert = leseHallWert();
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   resetLedArrayAndShow();
@@ -87,11 +97,11 @@ void setup() {
   leseStringAusEeprom(passwortStartAdresse, passwordLaenge, passwort);
   // ENDE WLAN Zugangsdaten aus EEPROM lesen
 
-  // RGB Slots lesen
-  berechneRgbSlotAdressen(passwortStartAdresse + passwordLaenge + 1);
+  // u.a. RGB Slots lesen
+  berechneWeitereEepromAdressen(passwortStartAdresse + passwordLaenge + 1);
   leseRgbWerteAusSlots();
   // Ende RGB Slots
-
+  hallDiff = leseByteAusEeprom(hallDiffAdresse);
   connectToWiFi();
   unsigned long timeout = millis() + (connectionTimeoutInSekunden * 1000);
   wifiConfigMode = false;
@@ -159,6 +169,9 @@ void loop() {
     }
   }
 
+  aktuellerHallWert = leseHallWert();
+  hallAktionAusfuehren();
+
   ledDelay(3000);
   if (serverHasBegun) {
     server.handleClient();
@@ -169,6 +182,25 @@ void connectToWiFi() {
   WiFi.mode(WIFI_STA);
   WiFi.hostname("ESP8266LedStrip");
   WiFi.begin(ssid, passwort);
+}
+
+int leseHallWert() {
+  int mittelwert = 0;
+  for (byte i = 1; i <= ANZAHL_HALL_MESSUNGEN; i++) {
+    mittelwert += analogRead(PIN_HALL_SENSOR);
+  }
+  return mittelwert / ANZAHL_HALL_MESSUNGEN;
+}
+
+void hallAktionAusfuehren() {
+  if (hallDiff == 0)
+    return;
+  if (aktuellerHallWert >= kalibrierterHallWert + hallDiff ||
+      aktuellerHallWert <= kalibrierterHallWert - hallDiff) {
+    setLedArrayAndShow(0, 0, 100);
+    ledDelay(1000);
+    resetLedArrayAndShow();
+  }
 }
 
 void ledDelay(int ms) {
@@ -184,7 +216,7 @@ void ledDelay(int ms) {
   }
 }
 
-void berechneRgbSlotAdressen(int startAdresse) {
+void berechneWeitereEepromAdressen(int startAdresse) {
   slot1rAdresse = startAdresse;
   slot1gAdresse = slot1rAdresse + 1;
   slot1bAdresse = slot1gAdresse + 1;
@@ -196,6 +228,8 @@ void berechneRgbSlotAdressen(int startAdresse) {
   slot3rAdresse = slot2bAdresse + 1;
   slot3gAdresse = slot3rAdresse + 1;
   slot3bAdresse = slot3gAdresse + 1;
+
+  hallDiffAdresse = slot3bAdresse + 1;
 }
 
 void leseRgbWerteAusSlots() {
@@ -371,6 +405,16 @@ void handleIndex() {
       }
       setLedArrayAndShow(rot, gruen, blau);
     }
+  } else if (serverArgs == 1) {
+    // Hall Schwellwert neu einstellen
+    int neuerHallDiffR = server.arg("hS").toInt();
+    if (neuerHallDiffR < 0 || neuerHallDiffR > 255) {
+      server.send(501, "text/html",
+                  "Schwellwert muss zwischen 0 und 255 liegen");
+      return;
+    }
+    hallDiff = (byte)neuerHallDiffR;
+    spechereByteInEeprom(hallDiff, hallDiffAdresse);
   }
   String html = F(
       "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> "
@@ -406,7 +450,7 @@ void handleIndex() {
       "(eigene Farbe)</option> <option value=\"93\">Slot 3 (eigene "
       "Farbe)</option> </select> <br> <input type=\"number\" min=\"0\" "
       "max=\"100\" name=\"sHelligkeit\" id=\"1\" autocomplete=\"off\" "
-      "placeholder=\"Helligkeit in Prozent\" required> <br> <button "
+      "placeholder=\"Helligkeit in Prozent\" required> <br> <br> <button "
       "type=\"submit\" class=\"pure-button ion-ios-pulse-strong\"> LEDs "
       "schalten</button> </form> </fieldset> <br> <fieldset> <legend>Eigene "
       "RGB-Farbe definieren</legend> <form class=\"pure-form\"> <input "
@@ -420,14 +464,25 @@ void handleIndex() {
       "schalten</button> oder <button name=\"b2\" type=\"submit\" value=\"1\" "
       "class=\"pure-button ion-android-cloud-done\"> Dauerhaft "
       "speichern</button> </form> </fieldset> </div> <div class=\"pure-u-1 "
-      "pure-u-md-1-1\"> <h2>Einstellungen</h2> <p> <a href=\"/wlan\" "
-      "class=\"pure-button\"> <i class=\"ion-wifi\"></i> WLAN </a> <a "
-      "href=\"/ledTestModus\" class=\"pure-button\"> <i "
-      "class=\"ion-ios-analytics-outline\"></i> LED Testmodus </a> </p> </div> "
-      "<div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Gespeicherte Farben</h2> "
-      "<table class=\"pure-table pure-table-horizontal\"> <thead> <tr> "
-      "<th>Slot</th> <th>Rot</th> <th>Grün</th> <th>Blau</th> </tr> </thead> "
-      "<tbody> <tr> <td>Slot 1</td> <td>");
+      "pure-u-md-1-1\"> <h2>Einstellungen</h2> <fieldset> <legend>Schwellwert "
+      "für Magnetsensor</legend> <p>Wenn die Aktion des Magnetsensors oft "
+      "unerwartet ausgeführt wird, lässt sich hier der Schwellwert erhöhen. "
+      "Mit 0 lässt er sich permanent deaktivieren</p> <form "
+      "class=\"pure-form\"> <input type=\"number\" name=\"hS\" "
+      "autocomplete=\"off\" placeholder=\"0 bis 255\" min=\"0\" max=\"255\" "
+      "required> <span>Aktueller Wert: ");
+  html += String(hallDiff);
+  html += F(
+      ", Standard: 10</span> <br> <br> <button type=\"submit\" "
+      "class=\"pure-button ion-checkmark-round\"> Speichern</button> </form> "
+      "</fieldset> <br> <fieldset> <legend>Weitere Einstellungsseiten</legend> "
+      "<a href=\"/wlan\" class=\"pure-button\"> <i class=\"ion-wifi\"></i> "
+      "WLAN </a> <a href=\"/ledTestModus\" class=\"pure-button\"> <i "
+      "class=\"ion-ios-analytics-outline\"></i> LED Testmodus </a> </fieldset> "
+      "</div> <div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Gespeicherte "
+      "Farben</h2> <table class=\"pure-table pure-table-horizontal\"> <thead> "
+      "<tr> <th>Slot</th> <th>Rot</th> <th>Grün</th> <th>Blau</th> </tr> "
+      "</thead> <tbody> <tr> <td>Slot 1</td> <td>");
   html += String(slot1r);
   html += F("</td> <td>");
   html += String(slot1g);
@@ -449,7 +504,15 @@ void handleIndex() {
       F("</td> </tr> </tbody> </table> </div> <div class=\"pure-u-1 "
         "pure-u-md-1-1\"> <h2>Status</h2> <p>");
   html += String(ESP.getFreeHeap());
-  html += F(" freier Heap</p> </div> </div> </body> </html>");
+  html += F(" freier Heap</p> <p>Aktuelles magnetisches Feld: <b>");
+  html += String(aktuellerHallWert);
+  html += F("</b>. Der beim Booten gemessene Wert liegt bei <b>");
+  html += String(kalibrierterHallWert);
+  html += F("</b>. Die Aktion wird bei einem Wert von +- <b>");
+  html += String(hallDiff);
+  html +=
+      F("</b> Differenz vom beim Booten gemessenem Wert ausgeführt</p> </div> "
+        "</div> </body> </html>");
 
   server.send(200, "text/html", html);
 }
