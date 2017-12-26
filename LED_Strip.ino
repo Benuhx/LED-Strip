@@ -87,6 +87,7 @@ void setup() {
   pinMode(PIN_HALL_SENSOR, INPUT);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
+  FastLED.setCorrection(TypicalSMD5050);
   resetLedArrayAndShow();
 
   // WLAN Zugangsdaten aus EEPROM lesen
