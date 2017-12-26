@@ -288,48 +288,6 @@ void setLedArrayAndShow(byte r, byte g, byte b) {
   FastLED.show();
 }
 
-void blinkeIpAdresse() {
-  ipAdresse = WiFi.localIP();
-  for (byte curSection = 0; curSection < 4; curSection++) {
-    byte curIp = ipAdresse[curSection];
-    byte ip[3];
-    if (curIp < 10) {
-      ip[0] = -1;
-      ip[1] = -1;
-      ip[2] = curIp;
-    } else if (curIp < 100) {
-      ip[0] = -1;
-      ip[1] = curIp / 10;
-      ip[2] = curIp % 10;
-    } else if (curIp <= 255) {
-      ip[0] = curIp / 100;
-      ip[1] = curIp / 10 % 10;
-      ip[2] = curIp % 10;
-    }
-
-    blinkIpSection(curSection, ip);
-  }
-}
-
-void blinkIpSection(byte section, byte* ip) {
-  resetLedArrayAndShow();
-  int curLed = -1 + section * 3;
-  for (byte i = 0; i < 3; i++) {
-    curLed++;
-    if (ip[i] <= 0 || ip[i] > 9) {
-      continue;
-    }
-    for (byte j = 0; j < ip[i]; j++) {
-      leds[curLed].setRGB(0, 100, 0);
-      FastLED.show();
-      delay(300);
-      leds[curLed].setRGB(0, 0, 0);
-      FastLED.show();
-      delay(300);
-    }
-  }
-}
-
 int ermittleEchteRgbWerte(int farbenCode, bool* converterErfolgreich) {
   if (farbenCode >= 100 && farbenCode <= 255) {
     // Ist schon der echte RGB-Wert
