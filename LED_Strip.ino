@@ -14,9 +14,9 @@
 #include "FastLED.h"
 
 // Einstellungen
-#define LED_TYPE WS2812B
+#define LED_TYPE WS2811
 #define RGB_ORDER GRB
-const byte ANZAHL_LEDS = 120;
+const byte ANZAHL_LEDS = 119;
 const byte PIN_LED_DATA = D3;
 const byte PIN_HALL_SENSOR = A0;
 const byte LED_DEFAULT_HELLIGKEIT = 60;
@@ -37,6 +37,7 @@ bool wifiConfigMode;
 const byte MAX_LAENGE_SSID_PASS = 128;
 char ssid[MAX_LAENGE_SSID_PASS];
 char passwort[MAX_LAENGE_SSID_PASS];
+IPAddress ipAdresse;
 ESP8266WebServer server(80);
 //## ENDE WiFi
 
@@ -79,10 +80,11 @@ const byte eepromUsedBytes = 195;
 CRGB leds[ANZAHL_LEDS];
 
 void setup() {
+  Serial.begin(9600);
+  Serial.println("Hallo :)");
   serverHasBegun = false;
   ledDelay(1000);
   pinMode(PIN_HALL_SENSOR, INPUT);
-  kalibrierterHallWert = leseHallWert();
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   resetLedArrayAndShow();
@@ -148,6 +150,11 @@ void setup() {
 
   server.begin();
   serverHasBegun = true;
+  MDNS.begin("led", WiFi.localIP());
+  kalibrierterHallWert = leseHallWert();
+  Serial.println(WiFi.localIP().toString());
+  ledDelay(300);
+  Serial.end();
 }
 
 void loop() {
@@ -188,6 +195,7 @@ int leseHallWert() {
   int mittelwert = 0;
   for (byte i = 1; i <= ANZAHL_HALL_MESSUNGEN; i++) {
     mittelwert += analogRead(PIN_HALL_SENSOR);
+    ledDelay(100);
   }
   return mittelwert / ANZAHL_HALL_MESSUNGEN;
 }
@@ -206,11 +214,7 @@ void hallAktionAusfuehren() {
 void ledDelay(int ms) {
   if (ms < 0)
     return;
-  int maxMsDelay = 50;
-  while (ms > 0) {
-    ms = ms - maxMsDelay * 4;
-    delay(maxMsDelay * 3);
-  }
+  delay(ms);
   if (serverHasBegun) {
     server.handleClient();
   }
@@ -284,25 +288,46 @@ void setLedArrayAndShow(byte r, byte g, byte b) {
   FastLED.show();
 }
 
-void checkIpBlink() {
-  /*if(digitalRead(PIN_IP_BLINK) == LOW) return;
-IPAddress addr  = WiFi.localIP();
-for(byte i = 0; i < 4; i++) {
-  unsigned int curNum[i] = addr[i];
-  //blinkCurIpDigit(i, curNum);
-}*/
+void blinkeIpAdresse() {
+  ipAdresse = WiFi.localIP();
+  for (byte curSection = 0; curSection < 4; curSection++) {
+    byte curIp = ipAdresse[curSection];
+    byte ip[3];
+    if (curIp < 10) {
+      ip[0] = -1;
+      ip[1] = -1;
+      ip[2] = curIp;
+    } else if (curIp < 100) {
+      ip[0] = -1;
+      ip[1] = curIp / 10;
+      ip[2] = curIp % 10;
+    } else if (curIp <= 255) {
+      ip[0] = curIp / 100;
+      ip[1] = curIp / 10 % 10;
+      ip[2] = curIp % 10;
+    }
+
+    blinkIpSection(curSection, ip);
+  }
 }
 
-void blinkCurIpDigit(byte pos, unsigned int num) {
-  for (byte i = 0; i < num; i++) {
-    resetLedArrayAndShow();
-    leds[pos].setRGB(0, 255, 0);
-    FastLED.show();
-    ledDelay(500);
-  }
+void blinkIpSection(byte section, byte* ip) {
   resetLedArrayAndShow();
-  FastLED.show();
-  ledDelay(1000);
+  int curLed = -1 + section * 3;
+  for (byte i = 0; i < 3; i++) {
+    curLed++;
+    if (ip[i] <= 0 || ip[i] > 9) {
+      continue;
+    }
+    for (byte j = 0; j < ip[i]; j++) {
+      leds[curLed].setRGB(0, 100, 0);
+      FastLED.show();
+      delay(300);
+      leds[curLed].setRGB(0, 0, 0);
+      FastLED.show();
+      delay(300);
+    }
+  }
 }
 
 int ermittleEchteRgbWerte(int farbenCode, bool* converterErfolgreich) {
