@@ -3,14 +3,14 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Benedikts LED Konfiguration</title>
+    <title>Benedikts LED Leiste</title>
     <link rel="stylesheet" href="http://yui.yahooapis.com/pure/0.6.0/pure-min.css">
     <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
 <body>
-    <h1>Benedikts LED Konfiguration</h1>
+    <h1>Benedikts LED Leiste</h1>
     <div class="pure-g">
         <div class="pure-u-1 pure-u-md-1-1">
             <h2>Farbe ändern</h2>
@@ -45,6 +45,8 @@
                         <option value="139101308">dunkles Gelb</option>
                         <option value="255215300">Gold</option>
 
+                        <option value="500500500">Regenbogen</option>
+
                         <option value="91">Slot 1 (eigene Farbe)</option>
                         <option value="92">Slot 2 (eigene Farbe)</option>
                         <option value="93">Slot 3 (eigene Farbe)</option>
@@ -71,6 +73,12 @@
                 </form>
             </fieldset>
         </div>
+        <div class="pure-u-1 pure-u-md-1-1">
+            <h2>Animationen</h2>
+            <a href="/animation?a=r" class="pure-button">
+                <i class="ion-wand"></i> Regenbogen
+            </a>
+        </div>
         <!--Einstellungen-->
         <div class="pure-u-1 pure-u-md-1-1">
             <h2>Einstellungen</h2>
@@ -78,7 +86,7 @@
                 <legend>Schwellwert für Magnetsensor</legend>
                 <p>Wenn die Aktion des Magnetsensors oft unerwartet ausgeführt wird, lässt sich hier der Schwellwert erhöhen. Mit 0 lässt er sich permanent deaktivieren</p>
                 <form class="pure-form">
-                    <input type="number" name="hS" autocomplete="off" placeholder="0 bis 255" min="0" max="255" required> <span>Aktueller Wert: #!String(hallDiff)!#, Standard: 10</span>
+                    <input type="number" name="hS" autocomplete="off" placeholder="0 bis 255" min="0" max="255" required> <span>Aktueller Wert: #!String(hallDiff)!#, Standard: 20</span>
                     <br>
                     <br>
                     <button type="submit" class="pure-button ion-checkmark-round"> Speichern</button>
@@ -108,13 +116,13 @@
                 </thead>
                 <tbody>
                     <tr>
-                        <td>Slot 1</td>
+                        <td>Slot 1 (bei Neustart und Magnetsensor Position 1)</td>
                         <td>#!String(slot1r)!#</td>
                         <td>#!String(slot1g)!#</td>
                         <td>#!String(slot1b)!#</td>
                     </tr>
                     <tr>
-                        <td>Slot 2</td>
+                        <td>Slot 2 (Magnetsensor Position 2)</td>
                         <td>#!String(slot2r)!#</td>
                         <td>#!String(slot2g)!#</td>
                         <td>#!String(slot2b)!#</td>

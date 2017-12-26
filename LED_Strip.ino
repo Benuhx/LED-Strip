@@ -74,8 +74,14 @@ int slot3gAdresse;
 int slot3bAdresse;
 
 int hallDiffAdresse;
+
 const byte eepromUsedBytes = 195;
 //##ENDE EEPROM Adressen
+
+// Animationen
+uint8_t curRainbowHue = 0;
+byte curAnimation;
+//##ENDE Rainbow Animation
 
 CRGB leds[ANZAHL_LEDS];
 
@@ -83,11 +89,13 @@ void setup() {
   Serial.begin(9600);
   Serial.println("Hallo :)");
   serverHasBegun = false;
+  curAnimation = '0';
   ledDelay(1000);
   pinMode(PIN_HALL_SENSOR, INPUT);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   FastLED.setCorrection(TypicalSMD5050);
+  FastLED.setMaxPowerInVoltsAndMilliamps(5, 6000);
   resetLedArrayAndShow();
 
   // WLAN Zugangsdaten aus EEPROM lesen
@@ -147,6 +155,8 @@ void setup() {
     server.on("/wlan", handleWlanKonfiguration);
     server.on("/ledTestModus", handleLedTestModus);
     server.on("/farbeSpeichern", handleFarbeSpeichern);
+    server.on("/animation", handleAnimation);
+    setLedArrayAndShow(slot1r, slot1g, slot1b);
   }
 
   server.begin();
@@ -159,9 +169,11 @@ void setup() {
 }
 
 void loop() {
+  yield();
   if (serverHasBegun) {
     server.handleClient();
   }
+  yield();
   if (wifiConfigMode) {
     return;
   }
@@ -177,10 +189,17 @@ void loop() {
     }
   }
 
-  aktuellerHallWert = leseHallWert();
-  hallAktionAusfuehren();
+  EVERY_N_MILLISECONDS(2000) {
+    aktuellerHallWert = leseHallWert();
+    hallAktionAusfuehren();
+  }
 
-  ledDelay(3000);
+  yield();
+  if (curAnimation != '0') {
+    EVERY_N_MILLISECONDS(5) { animationAusfuehren(); }
+  }
+
+  yield();
   if (serverHasBegun) {
     server.handleClient();
   }
@@ -196,7 +215,6 @@ int leseHallWert() {
   int mittelwert = 0;
   for (byte i = 1; i <= ANZAHL_HALL_MESSUNGEN; i++) {
     mittelwert += analogRead(PIN_HALL_SENSOR);
-    ledDelay(100);
   }
   return mittelwert / ANZAHL_HALL_MESSUNGEN;
 }
@@ -204,12 +222,31 @@ int leseHallWert() {
 void hallAktionAusfuehren() {
   if (hallDiff == 0)
     return;
-  if (aktuellerHallWert >= kalibrierterHallWert + hallDiff ||
-      aktuellerHallWert <= kalibrierterHallWert - hallDiff) {
-    setLedArrayAndShow(0, 0, 100);
+  if (aktuellerHallWert <= kalibrierterHallWert - hallDiff) {
+    // 1 oben
+    setLedArrayAndShow(slot1r, slot1g, slot1b);
     ledDelay(1000);
-    resetLedArrayAndShow();
   }
+  if (aktuellerHallWert >= kalibrierterHallWert + hallDiff) {
+    // 2 oben
+    setLedArrayAndShow(slot2r, slot2g, slot2b);
+    ledDelay(1000);
+  }
+}
+
+void animationAusfuehren() {
+  if (curAnimation == 'r') {
+    doRainbowAnimation();
+  }
+}
+
+void doRainbowAnimation() {
+  if (curRainbowHue == 255) {
+    curRainbowHue = 0;
+  }
+  curRainbowHue++;
+  fill_rainbow(leds, ANZAHL_LEDS, curRainbowHue, 10);
+  FastLED.show();
 }
 
 void ledDelay(int ms) {
@@ -271,14 +308,17 @@ void runTestmodeWithColor(byte r, byte g, byte b) {
 }
 
 void resetLedArray() {
+  curAnimation = '0';
   setLedArray(0, 0, 0);
 }
 
 void resetLedArrayAndShow() {
+  curAnimation = '0';
   setLedArrayAndShow(0, 0, 0);
 }
 
 void setLedArray(byte r, byte g, byte b) {
+  curAnimation = '0';
   for (byte i = 0; i < ANZAHL_LEDS; i++) {
     leds[i].setRGB(r, g, b);
   }
@@ -376,18 +416,23 @@ void handleIndex() {
                     "Parameter sColor ist falsch. Muss 9-stellig sein!");
         return;
       }
-      int rot = farbeCode / 1000000;
-      int gruen = (farbeCode % 1000000) / 1000;
-      int blau = farbeCode % 1000;
-      bool converterErfolgreich = true;
-      rot = ermittleEchteRgbWerte(rot, &converterErfolgreich);
-      gruen = ermittleEchteRgbWerte(gruen, &converterErfolgreich);
-      blau = ermittleEchteRgbWerte(blau, &converterErfolgreich);
-      if (!converterErfolgreich) {
-        server.send(501, "text/html",
-                    "ermittleEchteRgbWerte ist fehlgeschlagen");
+      if (farbeCode == 500500500) {
+        fill_rainbow(leds, ANZAHL_LEDS, 0, 10);
+        FastLED.show();
+      } else {
+        int rot = farbeCode / 1000000;
+        int gruen = (farbeCode % 1000000) / 1000;
+        int blau = farbeCode % 1000;
+        bool converterErfolgreich = true;
+        rot = ermittleEchteRgbWerte(rot, &converterErfolgreich);
+        gruen = ermittleEchteRgbWerte(gruen, &converterErfolgreich);
+        blau = ermittleEchteRgbWerte(blau, &converterErfolgreich);
+        if (!converterErfolgreich) {
+          server.send(501, "text/html",
+                      "ermittleEchteRgbWerte ist fehlgeschlagen");
+        }
+        setLedArrayAndShow(rot, gruen, blau);
       }
-      setLedArrayAndShow(rot, gruen, blau);
     }
   } else if (serverArgs == 1) {
     // Hall Schwellwert neu einstellen
@@ -402,13 +447,13 @@ void handleIndex() {
   }
   String html = F(
       "<!DOCTYPE html> <html lang=\"de\"> <head> <meta charset=\"UTF-8\"> "
-      "<title>Benedikts LED Konfiguration</title> <link rel=\"stylesheet\" "
+      "<title>Benedikts LED Leiste</title> <link rel=\"stylesheet\" "
       "href=\"http://yui.yahooapis.com/pure/0.6.0/pure-min.css\"> <link "
       "rel=\"stylesheet\" "
       "href=\"http://code.ionicframework.com/ionicons/2.0.1/css/"
       "ionicons.min.css\"> <meta name=\"viewport\" "
       "content=\"width=device-width, initial-scale=1\"> </head> <body> "
-      "<h1>Benedikts LED Konfiguration</h1> <div class=\"pure-g\"> <div "
+      "<h1>Benedikts LED Leiste</h1> <div class=\"pure-g\"> <div "
       "class=\"pure-u-1 pure-u-md-1-1\"> <h2>Farbe ändern</h2> <fieldset> "
       "<legend>Vordefinierte Farbe zeigen</legend> <form class=\"pure-form\"> "
       "<select name=\"sColor\"> <option value=\"300300300\">LEDs "
@@ -430,10 +475,11 @@ void handleIndex() {
       "value=\"334150310\">Wald Grün</option> <option "
       "value=\"255220300\">Gelb</option> <option value=\"139101308\">dunkles "
       "Gelb</option> <option value=\"255215300\">Gold</option> <option "
-      "value=\"91\">Slot 1 (eigene Farbe)</option> <option value=\"92\">Slot 2 "
-      "(eigene Farbe)</option> <option value=\"93\">Slot 3 (eigene "
-      "Farbe)</option> </select> <br> <input type=\"number\" min=\"0\" "
-      "max=\"100\" name=\"sHelligkeit\" id=\"1\" autocomplete=\"off\" "
+      "value=\"500500500\">Regenbogen</option> <option value=\"91\">Slot 1 "
+      "(eigene Farbe)</option> <option value=\"92\">Slot 2 (eigene "
+      "Farbe)</option> <option value=\"93\">Slot 3 (eigene Farbe)</option> "
+      "</select> <br> <input type=\"number\" min=\"0\" max=\"100\" "
+      "name=\"sHelligkeit\" id=\"1\" autocomplete=\"off\" "
       "placeholder=\"Helligkeit in Prozent\" required> <br> <br> <button "
       "type=\"submit\" class=\"pure-button ion-ios-pulse-strong\"> LEDs "
       "schalten</button> </form> </fieldset> <br> <fieldset> <legend>Eigene "
@@ -448,16 +494,18 @@ void handleIndex() {
       "schalten</button> oder <button name=\"b2\" type=\"submit\" value=\"1\" "
       "class=\"pure-button ion-android-cloud-done\"> Dauerhaft "
       "speichern</button> </form> </fieldset> </div> <div class=\"pure-u-1 "
-      "pure-u-md-1-1\"> <h2>Einstellungen</h2> <fieldset> <legend>Schwellwert "
-      "für Magnetsensor</legend> <p>Wenn die Aktion des Magnetsensors oft "
-      "unerwartet ausgeführt wird, lässt sich hier der Schwellwert erhöhen. "
-      "Mit 0 lässt er sich permanent deaktivieren</p> <form "
-      "class=\"pure-form\"> <input type=\"number\" name=\"hS\" "
-      "autocomplete=\"off\" placeholder=\"0 bis 255\" min=\"0\" max=\"255\" "
-      "required> <span>Aktueller Wert: ");
+      "pure-u-md-1-1\"> <h2>Animationen</h2> <a href=\"/animation?a=r\" "
+      "class=\"pure-button\"> <i class=\"ion-wand\"></i> Regenbogen </a> "
+      "</div> <div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Einstellungen</h2> "
+      "<fieldset> <legend>Schwellwert für Magnetsensor</legend> <p>Wenn die "
+      "Aktion des Magnetsensors oft unerwartet ausgeführt wird, lässt sich "
+      "hier der Schwellwert erhöhen. Mit 0 lässt er sich permanent "
+      "deaktivieren</p> <form class=\"pure-form\"> <input type=\"number\" "
+      "name=\"hS\" autocomplete=\"off\" placeholder=\"0 bis 255\" min=\"0\" "
+      "max=\"255\" required> <span>Aktueller Wert: ");
   html += String(hallDiff);
   html += F(
-      ", Standard: 10</span> <br> <br> <button type=\"submit\" "
+      ", Standard: 20</span> <br> <br> <button type=\"submit\" "
       "class=\"pure-button ion-checkmark-round\"> Speichern</button> </form> "
       "</fieldset> <br> <fieldset> <legend>Weitere Einstellungsseiten</legend> "
       "<a href=\"/wlan\" class=\"pure-button\"> <i class=\"ion-wifi\"></i> "
@@ -466,13 +514,14 @@ void handleIndex() {
       "</div> <div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Gespeicherte "
       "Farben</h2> <table class=\"pure-table pure-table-horizontal\"> <thead> "
       "<tr> <th>Slot</th> <th>Rot</th> <th>Grün</th> <th>Blau</th> </tr> "
-      "</thead> <tbody> <tr> <td>Slot 1</td> <td>");
+      "</thead> <tbody> <tr> <td>Slot 1 (bei Neustart und Magnetsensor "
+      "Position 1)</td> <td>");
   html += String(slot1r);
   html += F("</td> <td>");
   html += String(slot1g);
   html += F("</td> <td>");
   html += String(slot1b);
-  html += F("</td> </tr> <tr> <td>Slot 2</td> <td>");
+  html += F("</td> </tr> <tr> <td>Slot 2 (Magnetsensor Position 2)</td> <td>");
   html += String(slot2r);
   html += F("</td> <td>");
   html += String(slot2g);
@@ -554,10 +603,13 @@ void handleFarbeSpeichern() {
       F("</td> </tr> </tbody> </table> <fieldset> <form class=\"pure-form\"> "
         "<legend>Welcher Speicherslot soll genutzt werden? Falls in dem "
         "ausgewählten Slot bereits eine Farbe gespeichert ist, wird diese "
-        "überschrieben</legend> <select name=\"slot\"> <option "
-        "value=\"1\">Slot 1</option> <option value=\"2\">Slot 2</option> "
-        "<option value=\"3\">Slot 3</option> </select> <br> <br> <input "
-        "type=\"hidden\" name=\"rot\" value=\"");
+        "überschrieben.<br>Hinweis: Die Farbe in Slot 1 wird automatisch nach "
+        "dem Start dieses Systems angezeigt<br>Die Farben in Slot 1 und 2 "
+        "werden für den Magnetsensor verwendet</legend> <select name=\"slot\"> "
+        "<option value=\"1\">Slot 1 (wird nach Neustart angezeigt. Magnet "
+        "Aktion 1)</option> <option value=\"2\">Slot 2 (Magnet Aktion "
+        "2)</option> <option value=\"3\">Slot 3</option> </select> <br> <br> "
+        "<input type=\"hidden\" name=\"rot\" value=\"");
   html += String(rot);
   html += F("\"> <input type=\"hidden\" name=\"gruen\" value=\"");
   html += String(gruen);
@@ -568,6 +620,19 @@ void handleFarbeSpeichern() {
         "type=\"submit\" class=\"pure-button ion-android-cloud-done\"> Farbe "
         "speichern</button> </form> </fieldset> </div> </div> </body> </html>");
   server.send(200, "text/html", html);
+}
+
+void handleAnimation() {
+  if (server.args() != 1)
+    return;
+  byte animation = server.arg(0).c_str()[0];
+
+  switch (animation) {
+    case 'r':
+      curAnimation = animation;
+  }
+  server.sendHeader("Location", String("/"), true);
+  server.send(303, "text/plain", "");
 }
 
 void handleWlanKonfiguration() {
