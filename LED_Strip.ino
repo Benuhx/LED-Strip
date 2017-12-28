@@ -27,6 +27,7 @@ const byte ANZAHL_HALL_MESSUNGEN = 3;
 int kalibrierterHallWert;
 int aktuellerHallWert;
 byte hallDiff;
+unsigned long hallMessenMilis;
 //
 
 //## WiFi
@@ -81,13 +82,16 @@ const byte eepromUsedBytes = 195;
 // Animationen
 uint8_t curRainbowHue = 0;
 byte curAnimation;
+bool ersterAnimationsDruchlauf;
 //##ENDE Rainbow Animation
 
 CRGB leds[ANZAHL_LEDS];
 
 void setup() {
   serverHasBegun = false;
+  ersterAnimationsDruchlauf = false;
   curAnimation = '0';
+  hallMessenMilis = 0;
   ledDelay(1000);
   Serial.begin(9600);
   Serial.println("Hallo :)");
@@ -123,7 +127,7 @@ void setup() {
       curLed = 0;
     }
     leds[curLed].setRGB(0, 0, 255);
-    FastLED.show();
+    ledShow();
     curLed++;
     ledDelay(250);
     if (millis() > timeout) {
@@ -190,9 +194,16 @@ void loop() {
     }
   }
 
+  if (hallMessenMilis != 0 && millis() > hallMessenMilis) {
+    hallMessenMilis = 0;
+    kalibrierterHallWert = leseHallWert();
+  }
+
   EVERY_N_MILLISECONDS(2000) {
-    aktuellerHallWert = leseHallWert();
-    hallAktionAusfuehren();
+    if (hallMessenMilis == 0) {
+      aktuellerHallWert = leseHallWert();
+      hallAktionAusfuehren();
+    }
   }
 
   yield();
@@ -223,14 +234,19 @@ int leseHallWert() {
 void hallAktionAusfuehren() {
   if (hallDiff == 0)
     return;
+  int alterHallWert = kalibrierterHallWert;
   if (aktuellerHallWert <= kalibrierterHallWert - hallDiff) {
     // 1 oben
     setLedArrayAndShow(slot1r, slot1g, slot1b);
+    kalibrierterHallWert = alterHallWert;
+    hallMessenMilis = millis() + 5000;
     ledDelay(1000);
   }
   if (aktuellerHallWert >= kalibrierterHallWert + hallDiff) {
     // 2 oben
     setLedArrayAndShow(slot2r, slot2g, slot2b);
+    kalibrierterHallWert = alterHallWert;
+    hallMessenMilis = millis() + 5000;
     ledDelay(1000);
   }
 }
@@ -238,6 +254,11 @@ void hallAktionAusfuehren() {
 void animationAusfuehren() {
   if (curAnimation == 'r') {
     doRainbowAnimation();
+  }
+  if (ersterAnimationsDruchlauf) {
+    ledShow();  // sonst weisen wir alle 5ms kalibrierterHallWert neu zu
+  } else {
+    FastLED.show();
   }
 }
 
@@ -247,7 +268,6 @@ void doRainbowAnimation() {
   }
   curRainbowHue++;
   fill_rainbow(leds, ANZAHL_LEDS, curRainbowHue, 10);
-  FastLED.show();
 }
 
 void ledDelay(int ms) {
@@ -303,7 +323,7 @@ void runTestmode() {
 void runTestmodeWithColor(byte r, byte g, byte b) {
   for (byte i = 0; i < ANZAHL_LEDS; i++) {
     leds[i].setRGB(r, g, b);
-    FastLED.show();
+    ledShow();
     ledDelay(100);
   }
 }
@@ -327,7 +347,12 @@ void setLedArray(byte r, byte g, byte b) {
 
 void setLedArrayAndShow(byte r, byte g, byte b) {
   setLedArray(r, g, b);
+  ledShow();
+}
+
+void ledShow() {
   FastLED.show();
+  kalibrierterHallWert = leseHallWert();
 }
 
 int ermittleEchteRgbWerte(int farbenCode, bool* converterErfolgreich) {
@@ -420,7 +445,7 @@ void handleIndex() {
       if (farbeCode == 500500500) {
         resetLedArray();
         fill_rainbow(leds, ANZAHL_LEDS, 0, 10);
-        FastLED.show();
+        ledShow();
       } else {
         int rot = farbeCode / 1000000;
         int gruen = (farbeCode % 1000000) / 1000;
