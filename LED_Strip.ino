@@ -86,10 +86,10 @@ bool ersterAnimationsDruchlauf;
 //##ENDE Rainbow Animation
 
 // Animation Fire
-CRGBPalette16 currentPalette;
-uint32_t fireXscale = 20;
-uint32_t fireYscale = 3;
-byte fireIndex = 0;
+#define SPARKING 120
+#define COOLING 55
+bool gReverseDirection = false;
+CRGBPalette16 gPal;
 //##Ende Fire
 
 CRGB leds[ANZAHL_LEDS];
@@ -108,11 +108,7 @@ void setup() {
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   FastLED.setCorrection(TypicalSMD5050);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 6000);
-  currentPalette =
-      CRGBPalette16(CRGB::Black, CRGB::Black, CRGB::Black, CHSV(0, 255, 4),
-                    CHSV(0, 255, 8), CRGB::Red, CRGB::Red, CRGB::Red,
-                    CRGB::DarkOrange, CRGB::Orange, CRGB::Orange, CRGB::Orange,
-                    CRGB::Yellow, CRGB::Yellow, CRGB::Gray, CRGB::Gray);
+  gPal = HeatColors_p;
   resetLedArrayAndShow();
 
   // WLAN Zugangsdaten aus EEPROM lesen
@@ -211,6 +207,8 @@ void loop() {
     kalibrierterHallWert = leseHallWert();
   }
 
+  random16_add_entropy(rand());
+
   EVERY_N_MILLISECONDS(2000) {
     if (hallMessenMilis == 0) {
       aktuellerHallWert = leseHallWert();
@@ -285,10 +283,31 @@ void doRainbowAnimation() {
 }
 
 void doFireAnimation() {
+  static byte heat[ANZAHL_LEDS];
   for (int i = 0; i < ANZAHL_LEDS; i++) {
-    fireIndex = inoise8(i*fireXscale,millis()*fireYscale*ANZAHL_LEDS/255);
-    int r = i*(fireIndex)>>6;
-    leds[i] = ColorFromPalette(currentPalette, _min(r, 255), i*255/ANZAHL_LEDS, LINEARBLEND);;
+    heat[i] = qsub8(heat[i], random8(0, ((COOLING * 10) / ANZAHL_LEDS) + 2));
+  }
+
+  for (int k = ANZAHL_LEDS - 1; k >= 2; k--) {
+    heat[k] = (heat[k - 1] + heat[k - 2] + heat[k - 2]) / 3;
+  }
+
+  if (random8() < SPARKING) {
+    int y = random8(7);
+
+    heat[y] = qadd8(heat[y], random8(160, 255));
+  }
+
+  for (int j = 0; j < ANZAHL_LEDS; j++) {
+    byte colorindex = scale8(heat[j], 240);
+    CRGB color = ColorFromPalette(gPal, colorindex);
+    int pixelnumber;
+    if (gReverseDirection) {
+      pixelnumber = (ANZAHL_LEDS - 1) - j;
+    } else {
+      pixelnumber = j;
+    }
+    leds[pixelnumber] = color;
   }
 }
 
