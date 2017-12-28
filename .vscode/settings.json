@@ -5,6 +5,10 @@
         "type_traits": "cpp",
         "cstdlib": "cpp",
         "iosfwd": "cpp",
-        "limits": "cpp"
+        "limits": "cpp",
+        "system_error": "cpp",
+        "tuple": "cpp",
+        "utility": "cpp",
+        "rope": "cpp"
     }
 }

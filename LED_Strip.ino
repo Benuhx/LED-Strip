@@ -85,6 +85,13 @@ byte curAnimation;
 bool ersterAnimationsDruchlauf;
 //##ENDE Rainbow Animation
 
+// Animation Fire
+CRGBPalette16 currentPalette;
+uint32_t fireXscale = 20;
+uint32_t fireYscale = 3;
+byte fireIndex = 0;
+//##Ende Fire
+
 CRGB leds[ANZAHL_LEDS];
 
 void setup() {
@@ -101,6 +108,11 @@ void setup() {
   FastLED.setBrightness(LED_DEFAULT_HELLIGKEIT);
   FastLED.setCorrection(TypicalSMD5050);
   FastLED.setMaxPowerInVoltsAndMilliamps(5, 6000);
+  currentPalette =
+      CRGBPalette16(CRGB::Black, CRGB::Black, CRGB::Black, CHSV(0, 255, 4),
+                    CHSV(0, 255, 8), CRGB::Red, CRGB::Red, CRGB::Red,
+                    CRGB::DarkOrange, CRGB::Orange, CRGB::Orange, CRGB::Orange,
+                    CRGB::Yellow, CRGB::Yellow, CRGB::Gray, CRGB::Gray);
   resetLedArrayAndShow();
 
   // WLAN Zugangsdaten aus EEPROM lesen
@@ -254,6 +266,8 @@ void hallAktionAusfuehren() {
 void animationAusfuehren() {
   if (curAnimation == 'r') {
     doRainbowAnimation();
+  } else if (curAnimation == 'f') {
+    doFireAnimation();
   }
   if (ersterAnimationsDruchlauf) {
     ledShow();  // sonst weisen wir alle 5ms kalibrierterHallWert neu zu
@@ -268,6 +282,14 @@ void doRainbowAnimation() {
   }
   curRainbowHue++;
   fill_rainbow(leds, ANZAHL_LEDS, curRainbowHue, 10);
+}
+
+void doFireAnimation() {
+  for (int i = 0; i < ANZAHL_LEDS; i++) {
+    fireIndex = inoise8(i*fireXscale,millis()*fireYscale*ANZAHL_LEDS/255);
+    int r = i*(fireIndex)>>6;
+    leds[i] = ColorFromPalette(currentPalette, _min(r, 255), i*255/ANZAHL_LEDS, LINEARBLEND);;
+  }
 }
 
 void ledDelay(int ms) {
@@ -522,14 +544,16 @@ void handleIndex() {
       "class=\"pure-button ion-android-cloud-done\"> Dauerhaft "
       "speichern</button> </form> </fieldset> </div> <div class=\"pure-u-1 "
       "pure-u-md-1-1\"> <h2>Animationen</h2> <a href=\"/animation?a=r\" "
-      "class=\"pure-button\"> <i class=\"ion-wand\"></i> Regenbogen </a> "
-      "</div> <div class=\"pure-u-1 pure-u-md-1-1\"> <h2>Einstellungen</h2> "
-      "<fieldset> <legend>Schwellwert für Magnetsensor</legend> <p>Wenn die "
-      "Aktion des Magnetsensors oft unerwartet ausgeführt wird, lässt sich "
-      "hier der Schwellwert erhöhen. Mit 0 lässt er sich permanent "
-      "deaktivieren</p> <form class=\"pure-form\"> <input type=\"number\" "
-      "name=\"hS\" autocomplete=\"off\" placeholder=\"0 bis 255\" min=\"0\" "
-      "max=\"255\" required> <span>Aktueller Wert: ");
+      "class=\"pure-button\" item-width=\"100px\"> <i class=\"ion-wand\"></i> "
+      "Regenbogen </a> <a href=\"/animation?a=f\" class=\"pure-button\"> <i "
+      "class=\"ion-ios-flame\"></i> Feuer </a> </div> <div class=\"pure-u-1 "
+      "pure-u-md-1-1\"> <h2>Einstellungen</h2> <fieldset> <legend>Schwellwert "
+      "für Magnetsensor</legend> <p>Wenn die Aktion des Magnetsensors oft "
+      "unerwartet ausgeführt wird, lässt sich hier der Schwellwert erhöhen. "
+      "Mit 0 lässt er sich permanent deaktivieren</p> <form "
+      "class=\"pure-form\"> <input type=\"number\" name=\"hS\" "
+      "autocomplete=\"off\" placeholder=\"0 bis 255\" min=\"0\" max=\"255\" "
+      "required> <span>Aktueller Wert: ");
   html += String(hallDiff);
   html += F(
       ", Standard: 20</span> <br> <br> <button type=\"submit\" "
@@ -656,6 +680,7 @@ void handleAnimation() {
 
   switch (animation) {
     case 'r':
+    case 'f':
       curAnimation = animation;
   }
   server.sendHeader("Location", String("/"), true);
