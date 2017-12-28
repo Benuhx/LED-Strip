@@ -417,6 +417,7 @@ void handleIndex() {
         return;
       }
       if (farbeCode == 500500500) {
+        resetLedArray();
         fill_rainbow(leds, ANZAHL_LEDS, 0, 10);
         FastLED.show();
       } else {
