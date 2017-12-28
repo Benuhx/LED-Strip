@@ -86,10 +86,11 @@ byte curAnimation;
 CRGB leds[ANZAHL_LEDS];
 
 void setup() {
-  Serial.begin(9600);
-  Serial.println("Hallo :)");
   serverHasBegun = false;
   curAnimation = '0';
+  ledDelay(1000);
+  Serial.begin(9600);
+  Serial.println("Hallo :)");
   ledDelay(1000);
   pinMode(PIN_HALL_SENSOR, INPUT);
   FastLED.addLeds<LED_TYPE, PIN_LED_DATA, RGB_ORDER>(leds, ANZAHL_LEDS);
