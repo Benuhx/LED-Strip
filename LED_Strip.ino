@@ -566,7 +566,7 @@ void handleIndex() {
   html += String(ESP.getFreeHeap());
   html += F(" freier Heap</p> <p>Aktuelles magnetisches Feld: <b>");
   html += String(aktuellerHallWert);
-  html += F("</b>. Der beim Booten gemessene Wert liegt bei <b>");
+  html += F("</b>. Der Referenzwert liegt bei <b>");
   html += String(kalibrierterHallWert);
   html += F("</b>. Die Aktion wird bei einem Wert von +- <b>");
   html += String(hallDiff);
